@@ -17,12 +17,12 @@
     .bg-deco{ position:absolute; inset:0; pointer-events:none; z-index:0; }
     .tag{ font-size:.75rem; padding:3px 8px; border-radius:6px; display:inline-block; margin:0 6px 6px 0; white-space:nowrap; font-weight:600; }
     
-    /* === 卡片样式 === */
+    /* === 卡片样式：移除所有 transition，确保无动画 === */
     #card-preview{ 
       width:460px; 
       flex-shrink: 0; 
       transform-origin: top center;
-      transition: transform 0.2s ease, margin-bottom 0.2s ease;
+      /* transition: none;  <-- 确保这里没有任何过渡 */
     }
 
     .skill-row{border:1px solid #e5e7eb; border-radius:8px; padding:8px; display:flex; align-items:center; gap:8px; background:#fff;}
@@ -181,7 +181,7 @@
       </div>
     </div>
 
-    <!-- 右：预览卡 (添加了 flex justify-center 和 overflow-hidden) -->
+    <!-- 右：预览卡 -->
     <div id="preview-wrapper" class="w-full lg:w-1/2 flex flex-col items-center overflow-hidden">
       <div class="text-slate-400 text-xs my-4">- 实时预览 -</div>
       <div id="card-preview" class="card text-slate-800">
@@ -427,6 +427,7 @@ function updatePreview(){
   const role = $('select-role').value;
 
   // 1. 切换输入框显示 (DPS vs Healer)
+  // 不再清空数据，只是隐藏
   if(role === 'healer'){
     // 隐藏DPS项
     document.querySelectorAll('.role-dps').forEach(el=>el.classList.add('hidden-force'));
@@ -567,6 +568,7 @@ function autoFitCard() {
   if (containerWidth < CARD_WIDTH) {
     const scale = containerWidth / CARD_WIDTH;
     card.style.transform = `scale(${scale})`;
+    // CSS中我们移除了transition，这里手动添加，仅在resize时平滑过渡
     // 缩放后，dom占据的高度并没有变，下方会留白，需要手动调整负margin来收缩高度
     // 原始高度
     const originalHeight = card.offsetHeight; 
