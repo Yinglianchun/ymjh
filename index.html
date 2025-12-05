@@ -16,8 +16,17 @@
     .card{ background:#fff; border-radius:24px; box-shadow:0 10px 30px -5px rgba(0,0,0,.08); position:relative; overflow:hidden; }
     .bg-deco{ position:absolute; inset:0; pointer-events:none; z-index:0; }
     .tag{ font-size:.75rem; padding:3px 8px; border-radius:6px; display:inline-block; margin:0 6px 6px 0; white-space:nowrap; font-weight:600; }
-    /* 卡片宽度加大，避免六个字被截断 */
-    #card-preview{ width:460px; }
+    
+    /* === 核心修改：卡片样式 === */
+    /* 1. 设置固定宽度 460px，这是导出图片的基准尺寸 */
+    /* 2. transform-origin 设置为 top center，保证缩放时从顶部居中缩放 */
+    #card-preview{ 
+      width:460px; 
+      flex-shrink: 0; /* 防止被 flex 容器挤压 */
+      transform-origin: top center;
+      transition: transform 0.2s ease, margin-bottom 0.2s ease; /* 增加 margin-bottom 的过渡，让高度变化更丝滑 */
+    }
+
     .skill-row{border:1px solid #e5e7eb; border-radius:8px; padding:8px; display:flex; align-items:center; gap:8px; background:#fff;}
     .skill-row.active{border-color:#fbbf24; background:#fffbeb;}
     /* File input pretty (no emoji) */
@@ -177,8 +186,8 @@
       </div>
     </div>
 
-    <!-- 右：预览卡 -->
-    <div class="w-full lg:w-1/2 flex flex-col items-center">
+    <!-- 右：预览卡 (添加了 flex justify-center 和 overflow-hidden) -->
+    <div id="preview-wrapper" class="w-full lg:w-1/2 flex flex-col items-center overflow-hidden">
       <div class="text-slate-400 text-xs my-4">- 实时预览 -</div>
       <div id="card-preview" class="card text-slate-800">
         <div class="bg-deco">
@@ -423,7 +432,6 @@ function updatePreview(){
   const role = $('select-role').value;
 
   // 1. 切换输入框显示 (DPS vs Healer)
-  // 不再清空数据，只是隐藏
   if(role === 'healer'){
     // 隐藏DPS项
     document.querySelectorAll('.role-dps').forEach(el=>el.classList.add('hidden-force'));
@@ -475,7 +483,6 @@ function updatePreview(){
   $('preview-play-time').textContent='⏰ '+$('input-play-time').value;
 
   // 3. 智能显示/隐藏右侧格子的逻辑
-  // 核心逻辑：除了格挡是看数值是否为0，其他属性看当前职业是否需要显示
   const show = (id, condition) => {
       const el = $(id);
       if(el && el.parentElement && el.parentElement.classList.contains('stat')) {
@@ -483,18 +490,18 @@ function updatePreview(){
       }
   };
 
-  show('preview-hp', true); // 永远显示
-  show('preview-max-attack', true); // 永远显示
-  show('preview-crit', true); // 永远显示
-  show('preview-defense', true); // 永远显示
+  show('preview-hp', true);
+  show('preview-max-attack', true);
+  show('preview-crit', true);
+  show('preview-defense', true);
 
   // 职业专属显示
-  show('preview-main-stat', role !== 'healer'); // DPS显示主属
-  show('preview-hit', role !== 'healer');       // DPS显示命中
-  show('preview-treat-inten', role === 'healer'); // 奶妈显示疗强
-  show('preview-treat-gain', role === 'healer');  // 奶妈显示疗增
+  show('preview-main-stat', role !== 'healer');
+  show('preview-hit', role !== 'healer');
+  show('preview-treat-inten', role === 'healer');
+  show('preview-treat-gain', role === 'healer');
   
-  // 选填项显示 (只有格挡是根据数值判断)
+  // 选填项显示
   show('preview-block', parseVal($('input-block').value) > 0);
 
   // 头像
@@ -508,6 +515,8 @@ function updatePreview(){
   }
 
   drawRadar();
+  // 核心修复：每次内容变动（比如展开特技），都重新计算高度，消除底部空白
+  setTimeout(autoFitCard, 0); 
   
   // 特技
   const map=(type, opts, outId, boxId, klass)=>{
@@ -548,25 +557,71 @@ function updatePreview(){
   })();
 }
 
-// 初始化特技表单
+// 自动缩放函数 (核心逻辑)
+function autoFitCard() {
+  const card = $('card-preview');
+  if (!card) return;
+  const container = card.parentElement;
+  
+  // 卡片原始宽度
+  const CARD_WIDTH = 460;
+  // 容器当前宽度（减去一点padding保险）
+  const containerWidth = container.clientWidth - 20;
+
+  // 如果容器宽度小于卡片宽度，则缩放
+  if (containerWidth < CARD_WIDTH) {
+    const scale = containerWidth / CARD_WIDTH;
+    card.style.transform = `scale(${scale})`;
+    // 缩放后，dom占据的高度并没有变，下方会留白，需要手动调整负margin来收缩高度
+    // 原始高度
+    const originalHeight = card.offsetHeight; 
+    // 视觉高度 = 原始高度 * 缩放比例
+    // 需要向上缩进的距离 = 原始高度 - 视觉高度
+    const marginBottom = -(originalHeight * (1 - scale));
+    card.style.marginBottom = `${marginBottom}px`;
+  } else {
+    card.style.transform = 'none';
+    card.style.marginBottom = '0px';
+  }
+}
+
+// 监听窗口调整
+window.addEventListener('resize', autoFitCard);
+
+// 初始化
 initSkillList('gold-skills', goldOpts, 'gold');
 initSkillList('purple-skills', purpleOpts, 'purple');
 initSkillList('blue-skills', blueOpts, 'blue');
 initZMList('zhuanming-skills', zmOpts, 'zm');
 initTeaList('tea-skills', teaOpts, 'tea');
 
-// 绑定更新
 document.querySelectorAll('input,select,textarea').forEach(el=>{ el.addEventListener('input',updatePreview); el.addEventListener('change',updatePreview); });
 $('input-avatar').addEventListener('change', updatePreview);
+
+// 首次加载执行
 updatePreview();
+// 稍微延迟一下确保DOM渲染完毕再计算一次缩放
+setTimeout(autoFitCard, 100);
 
 
-// 导出（所见即所得）
+// 导出
 $('btn').addEventListener('click', async ()=>{
   const btn=$('btn'); const keep=btn.textContent; btn.textContent='生成中...'; btn.disabled=true;
   try{
     const node=$('card-preview');
-    const dataUrl = await htmlToImage.toPng(node, { pixelRatio: 3, backgroundColor: '#ffffff', cacheBust: true });
+    // 导出时先重置缩放，保证导出图片是 460px 原尺寸清晰图，而不是缩小的
+    const originalTransform = node.style.transform;
+    const originalMargin = node.style.marginBottom;
+    node.style.transform = 'none';
+    node.style.marginBottom = '0';
+    
+    // 移除 backgroundColor 选项，确保生成的图片是圆角透明背景
+    const dataUrl = await htmlToImage.toPng(node, { pixelRatio: 3, cacheBust: true });
+    
+    // 导出完恢复缩放
+    node.style.transform = originalTransform;
+    node.style.marginBottom = originalMargin;
+
     const a=document.createElement('a'); const name=$('input-name').value; const sect=$('select-sect').value;
     a.download=`一梦江湖_${sect}_${name}_简历卡.png`; a.href=dataUrl; a.click();
   }catch(e){ console.error(e); alert('生成失败，再点一次'); }
